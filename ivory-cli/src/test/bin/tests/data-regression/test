@@ -1,0 +1,78 @@
+#!/bin/sh -eux
+
+DIR=$(dirname $0)
+. "${DIR}/../../setup.sh"
+DICT_NAME="dict_regression"
+
+### V0 ###
+
+V0="ivory_run ${IVORY_V0}"
+$V0 create-repository -p "${REPOSITORY}"
+$V0 import-dictionary -r "${REPOSITORY}" -p "${INPUT}/dictionary.psv" -n "${DICT_NAME}"
+$V0 ingest-bulk -r "${REPOSITORY}" -z "Australia/Sydney" -i "${INPUT}/facts" -d "${DICT_NAME}"
+
+$V0 extract-snapshot -r "${REPOSITORY}"
+$V0 cat-facts "${REPOSITORY}/snapshots/00000000" | sort > "${TARGET}/snapshot.psv"
+diff_test_psv "${DIR}/expected/snapshot-00000000.psv" "${TARGET}/snapshot.psv"
+
+# Ingest the facts again so that a new incremental snapshot will be taken,
+# however the actual snapshot should turn out to be the same.
+$V0 ingest-bulk -r "${REPOSITORY}" -z "Australia/Sydney" -i "${INPUT}/facts" -d "${DICT_NAME}"
+
+### V1 - Dictionary thrift format ###
+
+V1="ivory_run $IVORY_V1"
+$V1 import-dictionary -r "${REPOSITORY}" -p "${INPUT}/dictionary.psv"
+
+### V3 - Last stop before we added global versioning
+
+V3="ivory_run $IVORY_V3"
+$V3 ingest -i "sparse:delimited:psv=${INPUT}/facts"
+$V3 snapshot
+
+### LATEST ###
+
+# Both of these should _not_ require and update and should exit cleanly
+
+$IVORY --version
+$IVORY --help
+
+if $IVORY cat-dictionary; then echo "Do not pass go - upgrade was not required"; exit 1; fi
+
+$IVORY update
+
+# TODO Instead of piping the stdout output, we should write the content directly to a file
+# https://github.com/ambiata/ivory/issues/22
+
+### CONFIG ####
+
+$IVORY config | grep -v "^$" > "${TARGET}/config"
+diff_test "${DIR}/expected/metadata/config" "${TARGET}/config"
+
+### DICTIONARY ###
+
+# Need to remove the first line which comes out as a warning for the optional codec
+# + any extra blank line
+$IVORY cat-dictionary | grep -v "^$" | sort > "${TARGET}/dictionary.psv"
+diff_test "${DIR}/expected/dictionary.psv" "${TARGET}/dictionary.psv"
+
+### INGEST ###
+
+$IVORY ingest -Ddfs.block.size=16777216 -i "sparse:delimited:psv=${INPUT}/facts"
+
+### SNAPSHOT ###
+
+$IVORY snapshot -o "dense:psv=${TARGET}/snap-dense" -o "sparse:psv=${TARGET}/snap-sparse"
+$IVORY debug-dump-facts -r "${REPOSITORY}" -s 00000001 | sort > "${TARGET}/snapshot.psv"
+diff_test_psv "${DIR}/expected/snapshot-00000001.psv" "${TARGET}/snapshot.psv"
+diff_test_mr "${DIR}/expected/snap-dense.psv" "${TARGET}/snap-dense"
+diff_test_mr "${DIR}/expected/snap-sparse.psv" "${TARGET}/snap-sparse"
+COUNT_FACTS_OUT=$(wc -l "${TARGET}/snapshot.psv" | awk '{print $1}')
+[ $(wc -l ${DIR}/expected/snapshot-00000000.psv | awk '{print $1}') = $COUNT_FACTS_OUT ]
+
+### CHORD ###
+
+$IVORY chord -c "${INPUT}/chord.psv" -o "dense:psv=${TARGET}/chord-dense" -o "sparse:psv=${TARGET}/chord-sparse"
+cat ${TARGET}/chord-dense/part-* | sort > "${TARGET}/chord-dense/all.psv"
+diff_test_mr "${DIR}/expected/chord-dense.psv" "${TARGET}/chord-dense"
+diff_test_mr "${DIR}/expected/chord-sparse.psv" "${TARGET}/chord-sparse"

@@ -1,0 +1,36 @@
+#!/bin/sh -eux
+
+DIR=$(dirname $0)
+. "${DIR}/../../setup.sh"
+
+V2="ivory_run $IVORY_V2"
+$V2 create-repository -p "${REPOSITORY}"
+$V2 import-dictionary -r "${REPOSITORY}" -p "${INPUT}/dictionary.psv"
+$V2 ingest -r "${REPOSITORY}" -i "${INPUT}/facts" -z "Australia/Sydney" -f "thrift"
+
+### SNAPSHOT ###
+$IVORY update
+$IVORY snapshot \
+  -o "dense:thrift=${TARGET}/dense.thrift" \
+  -o "sparse:thrift=${TARGET}/sparse.thrift" \
+  -o "sparse:delimited:psv:deprecated=${TARGET}/sparse-deprecated.psv" \
+  -o "dense:delimited:psv:deprecated=${TARGET}/dense-deprecated.psv"
+
+diff_test "${DIR}/expected/dictionary.psv" "${TARGET}/dense.thrift/.dictionary"
+diff_test "${DIR}/expected/dictionary.psv" "${TARGET}/sparse.thrift/.dictionary"
+diff_test_mr "${DIR}/expected/sparse-deprecated.psv" "${TARGET}/sparse-deprecated.psv"
+diff_test_mr "${DIR}/expected/dense-deprecated.psv" "${TARGET}/dense-deprecated.psv"
+
+$IVORY debug-dump-facts -r "${REPOSITORY}" -s 00000000 | sort > "${TARGET}/snapshot.psv"
+diff_test_psv "${DIR}/expected/snapshot.psv" "${TARGET}/snapshot.psv"
+
+cat_thrift() {
+  $IVORY cat-thrift -f "$1" -o "${TARGET}/$1.psv" "${TARGET}/$1.thrift"
+  diff_test_mr "${DIR}/expected/$1.psv" "${TARGET}/$1.psv"
+}
+
+cat_thrift "dense"
+cat_thrift "sparse"
+
+cp -r "${INPUT}/facts/halibut" "${TARGET}/fact.thrift"
+cat_thrift "fact"

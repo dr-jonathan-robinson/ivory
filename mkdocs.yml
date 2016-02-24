@@ -1,0 +1,23 @@
+site_name: Ivory
+docs_dir: guide
+site_dir: _site
+theme: readthedocs
+pages:
+ - ['index.md', 'Ivory']
+ - ['install.md', 'Getting Started', 'Installing Ivory']
+ - ['example.md', 'Getting Started', 'Example']
+ - ['features/data-modeling.md', 'Data Modeling', 'The Dictionary']
+ - ['features/states.md', 'Data Modeling', 'States']
+ - ['features/events.md', 'Data Modeling', 'Events']
+ - ['features/expressions.md', 'Data Modeling', 'Expressions']
+ - ['ingest/index.md', 'Ingesting Data', 'Overview']
+ - ['ingest/preparing-data.md', 'Ingesting Data', 'Preparing Data']
+ - ['ingest/text-eavt.md', 'Input Formats', 'Sparse Text Format']
+ - ['ingest/thrift-eavt.md', 'Input Formats', 'Sparse Thrift Format']
+ - ['query/index.md', 'Accessing Data', 'Overview']
+ - ['query/snapshot.md', 'Accessing Data', 'Snapshots']
+ - ['query/chord.md', 'Accessing Data', 'Chords']
+ - ['query/text-eavt.md', 'Output Formats', 'Sparse Text']
+ - ['query/thrift-eavt.md', 'Output Formats', 'Sparse Thrift']
+ - ['query/text-tabular.md', 'Output Formats', 'Dense Text']
+ - ['query/thrift-tabular.md', 'Output Formats', 'Dense Thrift']

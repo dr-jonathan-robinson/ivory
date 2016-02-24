@@ -1,0 +1,32 @@
+#!/bin/sh -eux
+
+DIR=$(dirname $0)
+. "${DIR}/../../setup.sh"
+
+$IVORY create-repository -z "Australia/Sydney" "${REPOSITORY}"
+$IVORY import-dictionary -p "${INPUT}/dictionary.psv"
+
+### Ingest a factset directory with several namespaces
+$IVORY ingest -i "sparse:delimited:psv=${INPUT}/facts-1"
+$IVORY ingest -i "sparse:delimited:psv|HALIBUT=${INPUT}/facts-2"
+$IVORY debug-dump-facts -r "${REPOSITORY}" -f 00000000 | sort > "${TARGET}/cat-facts-1.psv"
+$IVORY debug-dump-facts -r "${REPOSITORY}" -f 00000001 | sort > "${TARGET}/cat-facts-2.psv"
+
+diff_test_psv "${DIR}/expected/dump-facts-1.psv" "${TARGET}/cat-facts-1.psv"
+diff_test_psv "${DIR}/expected/dump-facts-2.psv" "${TARGET}/cat-facts-2.psv"
+
+OUT="/tmp/ivory-test-out-$(random)"
+$IVORY debug-dump-facts -f 00000000 -o "${OUT}/dump-facts-1.psv"
+$IVORY debug-dump-facts -f 00000001 -o "${OUT}/dump-facts-2.psv"
+
+$IVORY debug-dump-facts -f 00000000 -f 00000001 -e ID00000000 -a HALIBUT:swiss_cheese -o "${OUT}/dump-fact-query.psv"
+
+cat ${OUT}/dump-fact-query.psv/part-* | sort > "${TARGET}/dump-fact-query.psv.sorted"
+cat ${OUT}/dump-facts-1.psv/part-* | sort > "${TARGET}/dump-facts-1.psv.sorted"
+cat ${OUT}/dump-facts-2.psv/part-* | sort > "${TARGET}/dump-facts-2.psv.sorted"
+
+diff_test_psv "${DIR}/expected/dump-fact-query.psv" "${TARGET}/dump-fact-query.psv.sorted"
+diff_test_psv "${DIR}/expected/dump-facts-1.psv" "${TARGET}/dump-facts-1.psv.sorted"
+diff_test_psv "${DIR}/expected/dump-facts-2.psv" "${TARGET}/dump-facts-2.psv.sorted"
+
+rm -rf "${OUT}"

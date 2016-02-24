@@ -1,0 +1,13 @@
+#!/bin/sh -eu
+
+IVORY=$(dirname $0)/../..
+EXAMPLE=$IVORY/ivory-example
+TARGET=${1:-$OJ_ARTEFACT_ROOT}
+
+mkdir -p ${TARGET}
+
+(
+    cd $IVORY
+    ./sbt ";project cli; clean; universal:package-zip-tarball"
+    tar xvf $IVORY/ivory-cli/target/universal/ivory-cli*.tgz --strip-components 1 -C ${TARGET}
+) || exit $?
